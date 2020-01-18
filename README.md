@@ -1,2 +1,1 @@
-# DC_gourav_rajan
-Chromosomes detection
+# DC_detection_software
