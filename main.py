@@ -3,8 +3,7 @@ from Tkinter import *
 from ranking import rank, find_good_metaphases
 import os
 import matplotlib.pyplot as plt
-from PIL import Image, ImageTk
-import pyscreenshot as ImageGrab
+from PIL import Image, ImageTk, ImageGrab
 from os.path import basename
 import tkMessageBox
 import shutil
@@ -14,6 +13,8 @@ import numpy as np
 import openpyxl
 import time
 import cv2
+from openpyxl import Workbook
+
 #import io
 selected_file = ""
 selected_folder = ""
@@ -24,6 +25,9 @@ dirtext='Select a Directory'
 filetext= 'Select a file'
 
 initial_directory = ""
+
+
+
 
 
 class Metaphase_Analysis(Tkinter.Frame):
@@ -71,7 +75,6 @@ class Metaphase_Analysis(Tkinter.Frame):
         #textmsg = '1. text to display\n2. text to display\n3. text to display\n4. text to display\n5. text to display'
         f1 = open("Help.txt", "r")
         textmsg = f1.read()
-        #print textmsg
         showdialog = tkMessageBox.showinfo('Help', textmsg)
         f1.close()
 
@@ -179,6 +182,10 @@ def make_gui_before():
 counter_red=0
 counter_green=0
 counter_total=0
+fcounter_red=0
+fcounter_green=0
+fcounter_total=0
+
 mz=0
 dz=0
 tz=0
@@ -195,15 +202,16 @@ class Threader(threading.Thread):
         global originalPath,scoredImages,scoredImagesList, pres_time, rankPlot ,f3,counter_red,counter_green,counter_total,m
         global mc_and_dc_list, number_of_segments, good_metaphases_list, good_metaphases_list_with_coordinates, file_with_good_metaphases, actual_contours_path, dict_of_coordinates
         mc_and_dc_list, number_of_segments,good_metaphases_list, good_metaphases_list_with_coordinates,segpath, dict_of_coordinates = find_good_metaphases(downloaded, progress,file_name_list,f2,root,25)
-        print(mc_and_dc_list)
-        print(" sfhkdsfhdsfdsfdjsfdsfdjhfdgf dsjhf gdshjfghdjsgfhdg shjfgsdhjfg hjdsgfjasdgjfgahjghsgdfhjgfahjg jfgdjfhasdhf")
+        red=0
+        green=0
+        total=0
         originalPath,scoredImages, pres_time, scoredImagesList, rankPlot = rank(segpath)
         time.sleep(0.3)
         segment_path=''
+
         for i in range(0, len(originalPath)):
             #originalPath[i][0]
             rnk = originalPath[i][1][0]
-            print "**********",originalPath[i][0], rnk, str(rnk)
             q = originalPath[i][0].split('/')
             imgname = q[len(q) - 1]
             segmented_img = ''
@@ -212,12 +220,55 @@ class Threader(threading.Thread):
             segment_path=segmented_img+'/segments/scoredData.xlsx'
             segmented_img = segmented_img + '/segments/' + imgname
             img1 = cv2.imread(segmented_img)
-            print segmented_img
             #print filename[-2]
             path_to_store = selected_folder + '/segments/score' + str(rnk)+ '/' + str(imgname)
-            print path_to_store
-            print "^^^", time.time()
             status = cv2.imwrite(path_to_store, img1)
+        segment_path=segment_path[1:]
+        wb = openpyxl.load_workbook(segment_path)
+        ws = wb.active
+        col=ws.max_column
+        c1=ws.cell(2, 7)
+        if c1.value is None:
+            c1=ws.cell(1, col)
+            c1.value="Dicentric"
+            c1=ws.cell(1, col+1)
+            c1.value="Monocentric"
+            c1=ws.cell(1, col+2)
+            c1.value="Total Chromsome"
+            for k in range(0,ws.max_row-1):
+                for i in range(2, ws.max_row+1 ):
+                    c1=ws.cell(i,1)
+                    if(mc_and_dc_list[k][3]==c1.value):
+                        for j in range(col,col+4):
+                            c1=ws.cell(i, j)
+                            c1.value=mc_and_dc_list[k][j-col]
+                       # else:
+                        #    mc_and_dc_list[k][j-col]=c1.value
+                        break
+            wb.save(segment_path)
+        row=ws.max_row
+        col=ws.max_column
+        for i in range(2, row+1 ):
+            for j in range(col-3,col+1):
+                c1=ws.cell(i, j)
+                # print c1.value
+                # print mc_and_dc_list[i-2][j-col+3]
+                mc_and_dc_list[i-2][j-col+3]=c1.value
+        for i in mc_and_dc_list:
+            red+=i[0]
+            green+=i[1]
+            total+=i[2]
+        
+        counter_red=IntVar()
+        counter_green=IntVar()
+        counter_total=IntVar()
+        counter_red.set(red)
+        counter_green.set(green)
+        counter_total.set(total)
+        
+        
+        
+        
 
 
 class disp_segment:
@@ -262,7 +313,6 @@ def show_segments(histPath):
     photos = []
     destroy(root)
     i=0
-    print histPath
     for file in os.listdir(histPath):
         if file.endswith('.jpg'):
             img = ImageTk.PhotoImage(Image.open(histPath+file))  # PIL solution
@@ -291,6 +341,7 @@ def detect_dc(event,segments,text,extra=None):
         single = True
 
         click('show dc', event, None,segments, text)
+    make_counter()
     return
 def removekey(d, key):
     r = dict(d)
@@ -312,7 +363,6 @@ def click(msg, event, _btn, segments, text):
         dc_path = segment_path +os.path.basename(text)
         global file_name1
         file_name1=os.path.basename(text)
-        print file_name1,msg
         global histPath, filename_ext
         filename_ext = os.path.splitext(basename(text))[0]
         histPath = dir + "/results_" + filename_ext + '/actual/'
@@ -324,14 +374,13 @@ def click(msg, event, _btn, segments, text):
         width, height = image.size
         #print(path)
         head,tail=os.path.split(undo_path)
-        head=head+'./size.txt'
+        head=head+'/size.txt'
         
         data = np.genfromtxt(head)
         xmin,ymin,xmax,ymax,w1,h1=data
         #print(xmin,ymin,xmax,ymax)
         topleft = (xmin,ymin)
         bottomright = (xmax,ymax)
-        print('{}  {}  {}  {}\n'.format(xmin-50,ymin-50,xmax+50,ymax+50))
         cropped = image.crop((topleft[0], topleft[1], bottomright[0], bottomright[1]))
         width = bottomright[0] - topleft[0]
         height = bottomright[1] - topleft[1]
@@ -366,7 +415,6 @@ def click(msg, event, _btn, segments, text):
             photo = ImageTk.PhotoImage(image)
             event.widget.config(image=photo,width="100",height="100")
             images.append(photo)
-            print "DELETING " + os.path.basename(text)
             global good_metaphases_list, good_metaphases_list_with_coordinates
             good_metaphases_list = removekey(good_metaphases_list, text)
             good_metaphases_list_with_coordinates = removekey(good_metaphases_list_with_coordinates, text) 
@@ -380,18 +428,18 @@ def click(msg, event, _btn, segments, text):
         
         dir = os.path.dirname(text)
         path = segment_path+"/"+os.path.basename(text)
-        print dc_path, msg
         canvas.delete("all")
 
         canvas.pack(fill=Tkinter.BOTH, expand=2) # expand
         image = Image.open(dc_path)
-        print text
+
         path = text
         #filename_ext = os.path.splitext(basename(text))[0]
         histPath = dir + "/results_" + filename_ext + '/actual/'
         width, height = image.size
         head,tail=os.path.split(undo_path)
-        head=head+'./size.txt'        
+        head=head+'/size.txt'
+        
         data = np.genfromtxt(head)
         xmin,ymin,xmax,ymax,w1,h1=data
         #print(xmin,ymin,xmax,ymax)
@@ -401,7 +449,7 @@ def click(msg, event, _btn, segments, text):
         cropped = image.crop((topleft[0], topleft[1], bottomright[0], bottomright[1]))
         width = bottomright[0] - topleft[0]
         height = bottomright[1] - topleft[1]
-        image = cropped.resize((int(770), int(610)), Image.ANTIALIAS)
+        image = cropped.resize((int(680), int(600)), Image.ANTIALIAS)
         
         global photo1
         photo1 = ImageTk.PhotoImage(image)
@@ -416,14 +464,19 @@ def click(msg, event, _btn, segments, text):
 
 def test(event,sorted_pathlist,buttons, segments, text, btnclicked, extra=None):
     global single
+    
+        
     if extra == 1 and btnclicked == 0:
         single = True
         root.after(500, single_click, event, segments, text)
+        
         highlightimg(event, sorted_pathlist,buttons, segments, text, btnclicked)
+        
     if extra == 1 and (btnclicked == 1 or btnclicked == 2):
         single = True
         #root.after(500, single_click, event, segments, textpre)
         highlightimg(event, sorted_pathlist,buttons, segments, text, btnclicked)
+        
     elif extra == 101:
         single = False
         click('double click', event,sorted_pathlist, segments, text)
@@ -442,12 +495,13 @@ def doNothing(event):
     pass
 def highlightimg(event, sorted_pathlist, btns, segments, text, btnclicked):
     global prev, i_val,undo_path,redo_path
+    
     if btnclicked == 0:
         for i in range(0, len(sorted_pathlist)):
             if sorted_pathlist[i][0] == text:
                 canvas.bind("<Button-1>",doNothing)
                 canvas.bind("<Button-3>",doNothing)
-                undo_path=text[:-5]
+                undo_path=text[:-4]
                 head,tail=os.path.split(undo_path)
                 undo_path=head +'/results_'+tail+'/undo.txt'
                 redo_path=head +'/results_'+tail+'/redo.txt'
@@ -462,19 +516,48 @@ def highlightimg(event, sorted_pathlist, btns, segments, text, btnclicked):
                 f =open(redo_path,'w')
                 f.write("x1  y1  x2  y2  colour  id  type\n")
                 f.close
-                print(undo_path)
+
+                New_path = head + '/segments/color.xlsx'
+                yyy =str(head)
+                x = yyy.split("/")
+                one_morepath = "/"
+                for g in range(len(x)-2):
+                    one_morepath = one_morepath + x[g+1] + "/"
+
+                if os.path.isfile(New_path):
+                    pass
+                else:
+                    soft_dat = openpyxl.Workbook()
+                    soft_she = soft_dat.active
+                    soft_dat.save(New_path)
+                soft_dat = openpyxl.load_workbook(New_path)
+                soft_she = soft_dat.active
                 if event and prev != 2:
-                    btns[i].config(bg="red2")
+                    c1 = soft_she.cell(soft_she.max_row + 1, 1) 
+                    c1.value = i
+                    soft_dat.save(New_path)
+                    btns[i].config(bg="red")
+                    btns[i](background="red", foreground="red",activebackground="red", activeforeground="red")
                     if prev == 1:
                         btns[i_val].config(bg="gray99", fg="purple3", font="Dosis")
                     i_val = i
                 if event and prev == 2:
-                    btns[i].config(bg="red2")
+                    c1 = soft_she.cell(soft_she.max_row + 1,1) 
+                    c1.value = i
+                    soft_dat.save(New_path)
+                    btns[i].config(bg="red")
+                    btns[i](background="red", foreground="red",activebackground="red", activeforeground="red")
                     i_val = i
                 if i_val == i:
-                    btns[i].config(bg="red2")
+                    c1 = soft_she.cell(soft_she.max_row + 1, 1) 
+                    c1.value = i
+                    soft_dat.save(New_path)
+                    btns[i].config(bg="red")
+                    btns[i](background="red", foreground="red",activebackground="red", activeforeground="red")
                     i_val = i
                 break
+                soft_dat.save(New_path)
+
     elif btnclicked == 1:
         if i_val <= 0:
             i_val = 0
@@ -488,16 +571,19 @@ def highlightimg(event, sorted_pathlist, btns, segments, text, btnclicked):
                         n1 = h
                         break
                 i_val -= n1
-                btns[i_val].config(bg="red2")
+                btns[i_val].config(bg="red")
+                btns[i_val](background="red", foreground="red",activebackground="red", activeforeground="red")
                 btns[i_val+n1+1].config(bg="gray99", fg="purple3", font="Dosis")
                 root.after(500, single_click, event, segments, sorted_pathlist[i_val][0])
                 #break
             else:
-                btns[i_val].config(bg="red2")
+                btns[i_val].config(bg="red")
+                btns[i_val](background="red", foreground="red",activebackground="red", activeforeground="red")
                 root.after(500, single_click, event, segments, sorted_pathlist[i_val][0])
                 #break
             if prev == 1:
                 btns[i_val+1].config(bg="gray99", fg="purple3", font="Dosis")
+        
 
     elif btnclicked == 2:
         if i_val >= len(sorted_pathlist)-1:
@@ -512,11 +598,13 @@ def highlightimg(event, sorted_pathlist, btns, segments, text, btnclicked):
                         n2 = h - i_val
                         break
                 i_val += n2
-                btns[i_val].config(bg="red2")
+                btns[i_val].config(bg="red")
+                btns[i_val](background="red", foreground="red",activebackground="red", activeforeground="red")
                 btns[i_val-n2-1].config(bg="gray99", fg="purple3", font="Dosis")
                 root.after(500, single_click, event, segments, sorted_pathlist[i_val][0])
             else:
-                btns[i_val].config(bg="red2")
+                btns[i_val].config(bg="red")
+                btns[i_val](background="red", foreground="red",activebackground="red", activeforeground="red")
                 root.after(500, single_click, event, segments, sorted_pathlist[i_val][0])
             if prev == 1:
                 btns[i_val-1].config(bg="gray99", fg="purple3", font="Dosis")
@@ -529,27 +617,28 @@ d=0
 z=0
 shown = 0
 def make_counter():
-    global shown,w1,h1,counter_green,counter_red,counter_total
-    if shown == 0:
-        tkMessageBox.showinfo('What to do', 'Left-click to add a DC, Right-click to discard a DC.')
-        shown = 1
+    global shown,w1,h1,counter_green,counter_red,counter_total,fcounter_red,fcounter_green,fcounter_total
+    
+    shown = 1
     for widget in frm3.winfo_children():
         widget.destroy()
     datapts = []    #stores (x, y, color) tuple for every click 
     drawpts = []    #stores the dots
     undolist = []   #delets the dots
     undopts = []    #stores the deleted (x, y, color) tuple
-    
     head,tail=os.path.split(undo_path)
+  
     head,tail=os.path.split(head)
     head=head+"/segments/scoredData.xlsx"
     wb = openpyxl.load_workbook(head)
     ws = wb.active
+    
     for i in range(0, ws.max_row-1):
         if mc_and_dc_list[i][3] == filename_ext:
+    
             temp_i = i
             break        
-    
+
     def clickm(event,a):
         
         x1 = event.x-(w1+h1)/4
@@ -558,6 +647,7 @@ def make_counter():
         y2=event.y+(w1+h1)/4
         id=canvas.create_oval(x1,y1,x2,y2,fill='',width=2,outline='red')
         
+       
         f =open(undo_path,'a')
         f.write('{}  {}  {}  {}  {}  {}  {}\n'.format(x1,y1,x2,y2,0,id,a))
         f.close
@@ -569,17 +659,16 @@ def make_counter():
             c1.value+=1
             mc_and_dc_list[temp_i][0]+=1
             counter2.set(c1.value)
-            print(c1.value, mc_and_dc_list[temp_i][1])
             #global e 
             #e=e+1
             c1=ws.cell(temp_i+2, 7)
             c1.value+=1
             mc_and_dc_list[temp_i][2]+=1
             counter3.set(c1.value)
-            print(c1.value, mc_and_dc_list[temp_i][2])
-            print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                   1")
             counter_red.set(counter_red.get() +1)
             counter_total.set(counter_total.get() +1)
+            fcounter_red.set(fcounter_red.get() +1)
+            fcounter_total.set(fcounter_total.get() +1)
             wb.save(head)
         if(a==2):
             wb = openpyxl.load_workbook(head)
@@ -588,17 +677,16 @@ def make_counter():
             c1.value-=1
             mc_and_dc_list[temp_i][1]-=1
             counter1.set(c1.value)
-            print(c1.value, mc_and_dc_list[temp_i][1])
             #global e 
             #e=e+1
             c1=ws.cell(temp_i+2, 7)
             c1.value-=1
             mc_and_dc_list[temp_i][2]-=1
             counter3.set(c1.value)
-            print(c1.value, mc_and_dc_list[temp_i][2])
-            print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                   2")
             counter_green.set(counter_green.get() -1)
             counter_total.set(counter_total.get() -1)
+            fcounter_green.set(fcounter_green.get() -1)
+            fcounter_total.set(fcounter_total.get() -1)
             wb.save(head)
         
 
@@ -631,9 +719,11 @@ def make_counter():
             c1.value-=1
             mc_and_dc_list[temp_i][2]-=1
             counter3.set(c1.value)
-            print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                   3")
+          
             counter_red.set(counter_red.get() -1)
             counter_total.set(counter_total.get() -1)
+            fcounter_red.set(fcounter_red.get() -1)
+            fcounter_total.set(fcounter_total.get() -1)
             wb.save(head)
         if(a==2):
             wb = openpyxl.load_workbook(head)
@@ -642,17 +732,18 @@ def make_counter():
             c1.value+=1
             mc_and_dc_list[temp_i][1]+=1
             counter1.set(c1.value)
-            print(c1.value, mc_and_dc_list[temp_i][1])
+        
             #global e 
             #e=e+1
             c1=ws.cell(temp_i+2, 7)
             c1.value+=1
             mc_and_dc_list[temp_i][2]+=1
             counter3.set(c1.value)
-            print(c1.value, mc_and_dc_list[temp_i][2])
-            print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                   4")
+         
             counter_green.set(counter_green.get() +1)
             counter_total.set(counter_total.get() +1)
+            fcounter_green.set(fcounter_green.get() +1)
+            fcounter_total.set(fcounter_total.get() +1)
             wb.save(head)
 
     def undo():
@@ -665,7 +756,7 @@ def make_counter():
         
         if row > 1:
             x1,y1,x2,y2,colour,id,a=data[row-1]
-            print("undo",row,id)
+            
             canvas.delete(int(id))
             f=open(redo_path,'a')
             f.write('{}  {}  {}  {}  {}  {}  {}\n'.format(x1,y1,x2,y2,colour,id,a))
@@ -679,7 +770,7 @@ def make_counter():
             f.close()        
             wb = openpyxl.load_workbook(head)
             ws = wb.active
-            print(colour,a)
+           
             if colour == 0:
                 if ((mc_and_dc_list[temp_i][0]>=0)  and  ( mc_and_dc_list[temp_i][1]>=0)) :
                     if(a==1):
@@ -689,17 +780,18 @@ def make_counter():
                         c1.value-=1
                         mc_and_dc_list[temp_i][0]-=1
                         counter2.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][1])
+                    
                         #global e 
                         #e=e+1
                         c1=ws.cell(temp_i+2, 7)
                         c1.value-=1
                         mc_and_dc_list[temp_i][2]-=1
                         counter3.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][2])
-                        print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                  u 1")
+                      
                         counter_red.set(counter_red.get() -1)
                         counter_total.set(counter_total.get() -1)
+                        fcounter_red.set(fcounter_red.get() -1)
+                        fcounter_total.set(fcounter_total.get() -1)
                         wb.save(head)
                     if(a==2):
                         wb = openpyxl.load_workbook(head)
@@ -708,17 +800,18 @@ def make_counter():
                         c1.value+=1
                         mc_and_dc_list[temp_i][1]+=1
                         counter1.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][1])
+                      
                         #global e 
                         #e=e+1
                         c1=ws.cell(temp_i+2, 7)
                         c1.value+=1
                         mc_and_dc_list[temp_i][2]+=1
                         counter3.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][2])
-                        print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                   u 2")
+                    
                         counter_green.set(counter_green.get() +1)
                         counter_total.set(counter_total.get() +1)
+                        fcounter_green.set(fcounter_green.get() +1)
+                        fcounter_total.set(fcounter_total.get() +1)
                         wb.save(head)
 
             elif colour == 1:
@@ -736,9 +829,11 @@ def make_counter():
                         c1.value+=1
                         mc_and_dc_list[temp_i][2]+=1
                         counter3.set(c1.value)
-                        print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                u   3")
+                       
                         counter_red.set(counter_red.get() +1)
                         counter_total.set(counter_total.get() +1)
+                        fcounter_red.set(fcounter_red.get() +1)
+                        fcounter_total.set(fcounter_total.get() +1)
                         wb.save(head)
                     if(a==2):
                         wb = openpyxl.load_workbook(head)
@@ -747,21 +842,20 @@ def make_counter():
                         c1.value-=1
                         mc_and_dc_list[temp_i][1]-=1
                         counter1.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][1])
+                     
                         #global e 
                         #e=e+1
                         c1=ws.cell(temp_i+2, 7)
                         c1.value-=1
                         mc_and_dc_list[temp_i][2]-=1
                         counter3.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][2])
-                        print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                 u  4")
+                       
                         counter_green.set(counter_green.get() -1)
                         counter_total.set(counter_total.get() -1)
+                        fcounter_green.set(fcounter_green.get() -1)
+                        fcounter_total.set(fcounter_total.get() -1)
                         wb.save(head)
             
-            
-        print("undo")
 
     def redo():
         f =open(redo_path,'r')
@@ -771,7 +865,7 @@ def make_counter():
         row,col=np.shape(data)
         if row > 1:
             x1,y1,x2,y2,colour,id,a=data[row-1]
-            print(data[row-1])
+           
             f=open(undo_path,'a')
             if(colour==1):
                 id=canvas.create_oval(x1,y1,x2,y2,fill='',width=2,outline='green')
@@ -791,7 +885,7 @@ def make_counter():
             
             wb = openpyxl.load_workbook(head)
             ws = wb.active
-            print(colour,a)
+         
             if colour == 0:
                 if ((mc_and_dc_list[temp_i][0]>=0)  and  ( mc_and_dc_list[temp_i][1]>=0)) :
                     if(a==1):
@@ -801,17 +895,18 @@ def make_counter():
                         c1.value+=1
                         mc_and_dc_list[temp_i][0]+=1
                         counter2.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][1])
+                       
                         #global e 
                         #e=e+1
                         c1=ws.cell(temp_i+2, 7)
                         c1.value+=1
                         mc_and_dc_list[temp_i][2]+=1
                         counter3.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][2])
-                        print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                r   1")
+                      
                         counter_red.set(counter_red.get() +1)
                         counter_total.set(counter_total.get() +1)
+                        fcounter_red.set(fcounter_red.get() +1)
+                        fcounter_total.set(fcounter_total.get() +1)
                         wb.save(head)
                     if(a==2):
                         wb = openpyxl.load_workbook(head)
@@ -820,17 +915,18 @@ def make_counter():
                         c1.value-=1
                         mc_and_dc_list[temp_i][1]-=1
                         counter1.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][1])
+                    
                         #global e 
                         #e=e+1
                         c1=ws.cell(temp_i+2, 7)
                         c1.value-=1
                         mc_and_dc_list[temp_i][2]-=1
                         counter3.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][2])
-                        print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                r   2")
+                      
                         counter_green.set(counter_green.get() -1)
                         counter_total.set(counter_total.get() -1)
+                        fcounter_green.set(fcounter_green.get() -1)
+                        fcounter_total.set(fcounter_total.get() -1)
                         wb.save(head)
 
             elif colour == 1:
@@ -848,9 +944,11 @@ def make_counter():
                         c1.value-=1
                         mc_and_dc_list[temp_i][2]-=1
                         counter3.set(c1.value)
-                        print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                r   3")
+                     
                         counter_red.set(counter_red.get() -1)
                         counter_total.set(counter_total.get() -1)
+                        fcounter_red.set(fcounter_red.get() -1)
+                        fcounter_total.set(fcounter_total.get() -1)
                         wb.save(head)
                     if(a==2):
                         wb = openpyxl.load_workbook(head)
@@ -859,21 +957,22 @@ def make_counter():
                         c1.value+=1
                         mc_and_dc_list[temp_i][1]+=1
                         counter1.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][1])
+                       
                         #global e 
                         #e=e+1
                         c1=ws.cell(temp_i+2, 7)
                         c1.value+=1
                         mc_and_dc_list[temp_i][2]+=1
                         counter3.set(c1.value)
-                        print(c1.value, mc_and_dc_list[temp_i][2])
-                        print("dsfjdfddsj bfjdsjfdjsfjdsfjdsjfajsjfjsdflafalf                r   4")
+                       
                         counter_green.set(counter_green.get() +1)
                         counter_total.set(counter_total.get() +1)
+                        fcounter_green.set(fcounter_green.get() +1)
+                        fcounter_total.set(fcounter_total.get() +1)
                         wb.save(head)
-        print("redo")
+        
     def retrieve():
-        print("sd;fkjdb shjfbdjsh fbjhdsbfhjdsbfhjdbshjf bdshj fdshjvfhjdsvhfvdshf sdhjfjha")
+      
         if os.path.isfile(head):
             pass
         else:
@@ -888,7 +987,7 @@ def make_counter():
         f.write("x1  y1  x2  y2  colour  id  type\n")
         for z in data:
             x1,y1,x2,y2,colour,id,a=z
-            print(x1,y1,x2,y2,colour,id)
+           
             if(colour==1):
                 id=canvas.create_oval(x1,y1,x2,y2,fill='',width=2,outline='green')
             else:
@@ -911,14 +1010,15 @@ def make_counter():
         for i in range(2, row+1 ):
             for j in range(col-3,col+1):
                 c1=ws.cell(i, j)
-                print('{} '.format(c1.value))
-            print()
-        print(" fjhfjdhgjfgrjhgjhdfjhjghfjhgjhdjfhjghdjfh jghjfhgjhfjg jjhjghjfhgjfhjhjjgjhjfjkhkhfh")
         wb.save(head)
 
 
         #canvas.update()
         #ps = canvas.postscript(file = file_name, colormode = 'color')
+    
+    
+   
+    
     def mono():
         
         canvas.bind("<Button-1>",lambda event:clickm(event,2))
@@ -1000,6 +1100,7 @@ def make_counter():
 
 
 def display_metaphase():
+    global fcounter_red,fcounter_green,fcounter_total
     images = []
     buttons = []
     row_number = 0
@@ -1008,38 +1109,37 @@ def display_metaphase():
         widget.destroy()
     canvas.delete("all")
     min_score=threshold_entry.get()
-    print "min_score"
-    print min_score
-    print originalPath
+   
+    files = 0
+    fred = 0
+    fgreen = 0
+    ftotal = 0
+    x = originalPath[0][0].split("/")
+    original_path = "/"
+    for i in range(len(x)-3):
+        original_path = original_path + str(x[i+1]) + "/"
+    real_path = original_path + str(x[-2])
     sorted_pathlist=sorted(originalPath, key=lambda x:x[1][0])
-    print sorted_pathlist
-    print "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    print(mc_and_dc_list)
-    red=0
-    green=0
-    total=0
-    numbers = 0
+    
     temp=0
     flag=0
     for i in range(len(sorted_pathlist)):
+
         k = sorted_pathlist[i][0]
         v = sorted_pathlist[i][1]
-        print k,v
-        print v[0], min_score
-
         if int(v[0])<=int(min_score):
-            numbers +=1
-            print v[0], min_score
-            red = red + mc_and_dc_list[i][0]
-            green = green + mc_and_dc_list[i][1]
-            total = total + mc_and_dc_list[i][2]
+            
         # break
+            
+            fred = fred + mc_and_dc_list[-i-1][0]
+            fgreen = fgreen + mc_and_dc_list[-i-1][1]
+            ftotal = ftotal + mc_and_dc_list[-i-1][2]
+            files = files + 1
             for x in xrange(len(v)):
                 v[x] = str(v[x])
-            print v
             text = k
             segments = v[1]
-            print text
+         
             if temp != v[0]:
                 iteration=0
                 row_number+=1
@@ -1049,6 +1149,7 @@ def display_metaphase():
                 w.grid(row= row_number, columnspan=2)
                 row_number+=1
 #                tkvar = StringVar(root) 
+            
             image = Image.open(text)
             image = image.resize((100,100), Image.ANTIALIAS)
             photo = ImageTk.PhotoImage(image)
@@ -1068,32 +1169,41 @@ def display_metaphase():
             btn.bind('<Button-1>', lambda event, segments = segments, text=text :test(event, sorted_pathlist,buttons,segments,text,0,1))
             btn.bind('<Double-Button-1>', lambda event, segments = segments, text=text :test(event,sorted_pathlist,buttons,segments,text,0,101))
             temp=v[0]
+                 
+
+    ffiles=IntVar()
+    ffiles.set(files)
+    fcounter_red=IntVar()
+    fcounter_green=IntVar()
+    fcounter_total=IntVar()
+    fcounter_red.set(fred)
+    fcounter_green.set(fgreen)
+    fcounter_total.set(ftotal)
 
 
+    labels01=Label(f3, text="Files", bg="gray", fg="black", width = 25).pack(fill=X, pady=5)
+    labels02=Label(f3, textvariable=ffiles, bg="white", fg="black", width = 25).pack(fill=X, pady=5)
 
-    
-    counter_red=IntVar()
-    counter_green=IntVar()
-    counter_total=IntVar()
-    counter_red.set(red)
-    counter_green.set(green)
-    counter_total.set(total)
+    labels11=Label(f3, text="Dicentric", bg="gray", fg="black", width = 25).pack(fill=X, pady=5)
+    labels12=Label(f3, textvariable=fcounter_red, bg="white", fg="black", width = 25).pack(fill=X, pady=5)
 
-
-
-    text="File : "+str(numbers)
-    labels01 = Label(f3, text=text, bg="gray", fg="black", width = 25).pack(fill=X, pady=10)
-    
-    
-    labels11=Label(f3, text="Dicentric " , bg="gray", fg="black", width = 25).pack(fill=X, pady=5)
-    labels12=Label(f3, textvariable=counter_red, bg="white", fg="black", width = 25).pack(fill=X, pady=5)
-
-    labels21=Label(f3, text="Monocentric " , bg="gray", fg="black", width = 25).pack(fill=X, pady=5)
-    labels22=Label(f3, textvariable=counter_green, bg="white", fg="black", width = 25).pack(fill=X, pady=5)
+    labels21=Label(f3, text="Monocentric", bg="gray", fg="black", width = 25).pack(fill=X, pady=5)
+    labels22=Label(f3, textvariable=fcounter_green, bg="white", fg="black", width = 25).pack(fill=X, pady=5)
         
-    labels31=Label(f3, text="Total Chromosome " , bg="gray", fg="black", width = 25).pack(fill=X, pady=5)
-    labels32=Label(f3, textvariable=counter_total, bg="white", fg="black", width = 25).pack(fill=X, pady=5)
-    
+    labels31=Label(f3, text="Total Chromosome ", bg="gray", fg="black", width = 25).pack(fill=X, pady=5)
+    labels32=Label(f3, textvariable=fcounter_total, bg="white", fg="black", width = 25).pack(fill=X, pady=5)
+
+    New_path = real_path + '/segments/color.xlsx'
+    if os.path.isfile(New_path):
+        soft_dat = openpyxl.load_workbook(New_path)
+        soft_she = soft_dat.active
+        new_way = 2
+        for d in range(soft_she.max_row):
+            fin1 = soft_she.cell(new_way,1)
+            new_way = new_way + 1
+            g = fin1.value
+            buttons[g].config(bg="red")
+               
 
     prevBtn = Button(f3, text='<', bg='gray99', fg='black')
     prevBtn.place(relx=0.80, rely=0.99, anchor=SE)
@@ -1101,46 +1211,6 @@ def display_metaphase():
     nextBtn = Button(f3, text='>', bg='gray99', fg='black')
     nextBtn.place(relx=0.90, rely=0.99, anchor=SE)
     nextBtn.bind('<Button-1>', lambda event, segments = segments, text=text :test(event,sorted_pathlist,buttons,segments,text, 2, 1))
-    
-    
-
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def display_rank():
@@ -1165,7 +1235,7 @@ def image_path():           # For Input
         for file in os.listdir(selected_folder):
             if file.endswith(extension):
                 file_name_list.append(os.path.join(selected_folder, file))
-    
+
     file_name_list.sort()
     if not file_name_list:
         print "Select appropriate folder"
@@ -1173,6 +1243,9 @@ def image_path():           # For Input
     else :
 
         global progress,mc_and_dc_list
+        
+    
+        
         progress= ttk.Progressbar(f2, orient = 'horizontal', maximum = len(file_name_list), variable=downloaded, mode = 'determinate')
         progress.pack(fill=BOTH)
         start = ttk.Button(f2,text='Run ranking algorithm',command= lambda: Threader())
@@ -1181,8 +1254,6 @@ def image_path():           # For Input
         b2=Button(f3, text = "Show Rank Statistics", command=display_rank)
         b2.pack(fill=X, pady = 30)
         
-        b11=Button(f3, text="Manual Detection ",command=make_counter,bg="gray", fg="black", state=ACTIVE,width = 25).pack(fill=X, pady=10)
-
         global threshold_entry
         threshold_entry = Entry(f3, bd =5)
         threshold_entry.delete(0,'end')
@@ -1217,11 +1288,5 @@ def image_path():           # For Input
 
 if __name__ == '__main__':
     red_cross = Image.open("Red-Cross-PNG-File.png")
-#    red_cross = red_cross.crop((500, 500, 1500, 1500))
-#    red_cross = red_cross.resize((240,240), Image.ANTIALIAS)
 
     file_name_list,f2,root = image_path()
-#    print "originalPath: ",originalPath
-#    print "mc_and_dc_list: ",mc_and_dc_list
-#    print "scoredImages: ", scoredImages
-#    print "scoredImagesList: ", scoredImagesList
