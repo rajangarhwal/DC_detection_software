@@ -97,7 +97,7 @@ def create_dir(newpath):
         #print(newpath)
         #print("sdfh kjdsbfj djghdjg jg djfg jdfgjdf gfdhg dfu ghdfjghdfhgidfhgjfdgdfjgd gjdh")
         os.makedirs(newpath)
-        print "New Directory by Rajan  Created : " + newpath    
+        # print "New Directory Created : " + newpath    
     return
 def delete_file(filepath):
     try:
@@ -134,7 +134,6 @@ def make_segments(count,thresh,blur,image, path, newpath, actual_contours_path,s
     ret,th = cv2.threshold(blur,thresh,255,cv2.THRESH_BINARY)
 
     # individual = 'croppedSegments/'
-    xpath = newpath
     imsave(newpath + '/thresholded_image.jpg',th)
     filename = list(path.split('/'))
     filename=filename[-1]
@@ -195,7 +194,6 @@ def make_segments(count,thresh,blur,image, path, newpath, actual_contours_path,s
             w1+=w
             h1+=h
             counters=counters+1
-#            print(x1-w,y1-h,x2+w,y2+h,counters,h1,h)
             crop_th = crop_image(thresholded_image, center, angle, w, h)
             crop = crop_image(loaded_image, center, angle, w, h)
             image = crop
@@ -212,6 +210,7 @@ def make_segments(count,thresh,blur,image, path, newpath, actual_contours_path,s
             image = skimage.color.rgb2gray(skimage.io.imread(actual_contours_path + 'contour_' + str(number) + '.jpg'))
             delete_file(newpath + '/' + 'contour_' + str(number) + '.jpg')
             delete_file(actual_contours_path + 'contour_' + str(number) + '.jpg')
+
             total=[]
             h=image.shape[0]
             w=image.shape[1]
@@ -311,7 +310,6 @@ def make_segments(count,thresh,blur,image, path, newpath, actual_contours_path,s
     cv2.imwrite(segment_path+filename, actual_image)
     time.sleep(0.30)
     #cv2.waitKey(50)
-    print "^^^^^^^^^^^^^^",time.time()
     i=count+1
     # while soft_sheet['A'+str(i)]==None:
     soft_sheet['A'+str(i)]=file
@@ -344,7 +342,6 @@ def sequence(count,path):               # Flow Sequence
     image = cv2.imread(path + '_filtered_image.jpg',0)      # open filtered image and store it in variable "image"
     delete_file(path + '_filtered_image.jpg')               # delete filtered image from disk
     newpath = dir + "/results_" + filename_ext              # path for storing results
-    print(newpath)
     create_dir(newpath)                                     # creating directory for results
     actual_contours_path = newpath + '/actual/'             # path where actual segments are saved
     create_dir(actual_contours_path)                        # creating directory for actual segments
@@ -530,7 +527,6 @@ def rank(folder):
     # print folder
     # folder = 'seg3/'
     global soft_data, soft_sheet
-    print(os.getcwd())
     
     scoredImages = []
     originalPath = []
@@ -602,7 +598,6 @@ def rank(folder):
                 # if counter==2:
                 #   c+=1
                 #   os.remove(path+file)
-        print c
                 # print file,"not a single straight chromosome"
         score-=overlap_count
         score = max(1,score)
@@ -675,14 +670,11 @@ def rank(folder):
         c1=soft_sheet.cell(1+i,4)
         c1.value=value[0]
        
-        print "%s: %s" % (key, value)
         i+=1
-    print tps
     pres_time = time.time()
     # print scoredImages.keys()
     #c1=soft_sheet.cell(1+1,8)
     #c1.value="dsjhfjkdshfjd"
-    #print("sdk fdfdfdfhdshf dgshfghdjsgfhjdsghfgdshjfg hdg fhjsdghfgdshgfhdsgfdgshjfgdhs gfhdjsgfh")
     soft_data.save(head)
     #print(rankPlot);
     
