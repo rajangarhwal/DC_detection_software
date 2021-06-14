@@ -8,7 +8,7 @@ Graphical user interface (GUI) developed in Main module using Tkinter in python.
 
 ## Ranking Module
 
-All the algorithms or image processing in python is done inside Ranking module.
+All the algorithms or image processing in python is done inside Ranking module. Rank defining of a image according to image's property is also done in Ranking module.
 
 ## Software Requirements
 1. Python 2.7
@@ -28,3 +28,16 @@ All the algorithms or image processing in python is done inside Ranking module.
 15. progressbar
 16. random
 17. matplotlib
+
+## Steps to use Software
+1. Open Main python file to load GUI
+2. Select the folder in which microscopic image of blood cells resides ( Select Folder ).
+3. Run the Ranking algorithm on selected images (Run Ranking Algorithm ).
+4. Select the rank from which you want to select images ( Show Images Upto ).
+5. Check the images rank statistics ( Rank Statistics ).
+6. Select one image and detect DC (Red boundary), Mono(Green Boundary) centric chromosomes ( Detect DC ).
+7. If want use manual detection (Manual Detection).
+8. In manual detection, select Mono centric right click to add an mono centric chromosome and left to delete.
+9. In manual detection, select Di centric left click to add an di centric chromosome and right to delete.
+10. Stats ( Total files, Total Chromosomes, Di centric Chromosomes, Mono centric Chromosomes) are shown below in the GUI.
+11. EXIT ( Exit ).
