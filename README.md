@@ -1,4 +1,15 @@
 # DC_detection_software
+
+This software AIM on microscopic image of blood cell. Software refines the chromosomes of microscopic image of blood cell using Image processing in python. Developed GUI for user interaction with chromosomes Di centric, Mono centric counts and stats. Manual detection also implemented for better accuracy.
+
+## Main Module
+ 
+Graphical user interface (GUI) developed in Main module using Tkinter in python. Manual detection also implemented in the same.
+
+## Ranking Module
+
+All the algorithms or image processing in python is done inside Ranking module.
+
 ## Software Requirements
 1. Python 2.7
 2. cv2 ( OpenCV )
