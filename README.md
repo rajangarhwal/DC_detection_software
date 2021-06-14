@@ -5,9 +5,15 @@
 3. Tkinter, Tkconstants, tkFileDialog, tkMessageBox, ttk
 4. os
 5. PIL
-6. shutil
-7. threading
-8. numpy
-9. openpyxl
-10. time
-11. openpyxl
+6. time
+7. shutil
+8. sys
+9. threading
+10. numpy
+11. argparse
+12. openpyxl
+13. skimage
+14. scipy
+15. progressbar
+16. random
+17. matplotlib
